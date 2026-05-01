@@ -41,29 +41,43 @@ export default async function ProfessorDashboard() {
 
         {/* Cards de ação */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
+
+          {/* Banco de Questões (AGORA COM LINK) */}
+          <a
+            href="/professor/questoes"
+            className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer block"
+          >
             <div className="w-12 h-12 bg-amber-100 rounded-xl flex items-center justify-center mb-4">
               <span className="text-2xl">📝</span>
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">Banco de Questões</h3>
-            <p className="text-sm text-gray-500">Crie e gerencie questões por disciplina</p>
-          </div>
+            <p className="text-sm text-gray-500">
+              Crie e gerencie questões por disciplina
+            </p>
+          </a>
 
+          {/* Minhas Provas */}
           <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
             <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center mb-4">
               <span className="text-2xl">📋</span>
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">Minhas Provas</h3>
-            <p className="text-sm text-gray-500">Monte e envie provas para aprovação</p>
+            <p className="text-sm text-gray-500">
+              Monte e envie provas para aprovação
+            </p>
           </div>
 
+          {/* Resultados */}
           <div className="bg-white rounded-xl border border-gray-200 p-6 hover:shadow-md transition-shadow cursor-pointer">
             <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center mb-4">
               <span className="text-2xl">📊</span>
             </div>
             <h3 className="font-semibold text-gray-900 mb-1">Resultados</h3>
-            <p className="text-sm text-gray-500">Acompanhe o desempenho das suas turmas</p>
+            <p className="text-sm text-gray-500">
+              Acompanhe o desempenho das suas turmas
+            </p>
           </div>
+
         </div>
 
         {/* Status do sistema */}
