@@ -20,13 +20,34 @@ export default function LoginPage() {
     const supabase = createClient()
 
     if (modo === 'senha') {
-      const { error } = await supabase.auth.signInWithPassword({ email, password: senha })
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password: senha })
       if (error) {
         setErro('E-mail ou senha incorretos.')
         setCarregando(false)
         return
       }
-      router.refresh()
+
+      // Buscar papel do usuário
+      const { data: usuario } = await supabase
+        .from('usuarios')
+        .select('papel')
+        .eq('id', data.user.id)
+        .single()
+
+      const papel = usuario?.papel
+
+      if (papel === 'superadmin') {
+        router.push('/superadmin/dashboard')
+      } else if (papel === 'coordenador') {
+        router.push('/coordenador/dashboard')
+      } else if (papel === 'diretor') {
+        router.push('/diretor/dashboard')
+      } else if (papel === 'professor') {
+        router.push('/professor/provas')
+      } else {
+        router.push('/coordenador/dashboard')
+      }
+
     } else {
       const { error } = await supabase.auth.signInWithOtp({ email })
       if (error) {
@@ -49,7 +70,6 @@ export default function LoginPage() {
           <p className="text-gray-500 text-sm mt-1">Sistema de Avaliações com IA</p>
         </div>
 
-        {/* Seletor de modo */}
         <div className="flex rounded-lg border border-gray-200 mb-6 overflow-hidden">
           <button
             onClick={() => setModo('senha')}
