@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 
 export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
+
   let response = NextResponse.next()
 
   const supabase = createServerClient(
@@ -10,9 +11,9 @@ export async function middleware(request: NextRequest) {
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
+        getAll: () => request.cookies.getAll(),
+        setAll: (cookies) => {
+          cookies.forEach(({ name, value, options }) => {
             response.cookies.set(name, value, options)
           })
         },
@@ -22,16 +23,20 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  if (!user && !pathname.startsWith('/login')) {
+  // 🔒 Não logado
+  if (!user && pathname !== '/login') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  if (user && (pathname === '/' || pathname === '/login')) {
+  // 🔁 Se logado
+  if (user) {
     const { data: usuario } = await supabase
       .from('usuarios')
       .select('papel')
       .eq('id', user.id)
       .maybeSingle()
+
+    const papel = usuario?.papel
 
     const dashboards: Record<string, string> = {
       superadmin: '/superadmin/dashboard',
@@ -40,8 +45,18 @@ export async function middleware(request: NextRequest) {
       professor: '/professor/provas',
     }
 
-    const destino = dashboards[usuario?.papel ?? '']
-    if (destino) return NextResponse.redirect(new URL(destino, request.url))
+    // 🔁 Redirecionamento automático
+    if (pathname === '/' || pathname === '/login') {
+      const destino = dashboards[papel ?? '']
+      if (destino) {
+        return NextResponse.redirect(new URL(destino, request.url))
+      }
+    }
+
+    // 🔐 Proteção de rota
+    if (pathname.startsWith('/superadmin') && papel !== 'superadmin') {
+      return NextResponse.redirect(new URL('/', request.url))
+    }
   }
 
   return response
