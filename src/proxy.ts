@@ -1,49 +1,62 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function proxy(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
-  let response = NextResponse.next({ request })
+
+  let response = NextResponse.next()
 
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     {
       cookies: {
-        getAll() { return request.cookies.getAll() },
+        getAll() {
+          return request.cookies.getAll()
+        },
         setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value))
-          response = NextResponse.next({ request })
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options))
+          cookiesToSet.forEach(({ name, value, options }) => {
+            response.cookies.set(name, value, options)
+          })
         },
       },
     }
   )
 
-  const { data: { user } } = await supabase.auth.getUser()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
 
+  // 🔒 Se não estiver logado, redireciona para login
   if (!user && !pathname.startsWith('/login')) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
+  // 🔁 Se já estiver logado e tentar acessar login ou raiz
   if (user && (pathname === '/' || pathname === '/login')) {
-    const { data: usuario } = await supabase
+    const { data: usuario, error } = await supabase
       .from('usuarios')
       .select('papel')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
+
+    if (error) {
+      console.error('Erro ao buscar papel do usuário:', error)
+      return response
+    }
 
     const dashboards: Record<string, string> = {
-      superadmin: '/admin/dashboard',
+      superadmin: '/superadmin/dashboard',
       diretor: '/diretor/dashboard',
       coordenador: '/coordenador/dashboard',
-      professor: '/professor/dashboard',
+      professor: '/professor/provas',
     }
 
     const destino = dashboards[usuario?.papel ?? '']
-    if (destino) return NextResponse.redirect(new URL(destino, request.url))
+
+    if (destino) {
+      return NextResponse.redirect(new URL(destino, request.url))
+    }
   }
 
   return response
