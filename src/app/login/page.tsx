@@ -1,4 +1,3 @@
-Set-Content src\app\login\page.tsx -Value @'
 'use client'
 
 import { useState } from 'react'
@@ -87,4 +86,3 @@ export default function LoginPage() {
     </div>
   )
 }
-'@
