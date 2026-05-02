@@ -1,7 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl
 
   let response = NextResponse.next()
@@ -26,6 +26,10 @@ export async function middleware(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  // ✅ Logs posicionados corretamente, conforme instruções do Passo 2
+  console.log('USER:', user?.id)
+  console.log('URL:', process.env.NEXT_PUBLIC_SUPABASE_URL)
 
   // 🔒 Se não estiver logado, redireciona para login
   if (!user && !pathname.startsWith('/login')) {
