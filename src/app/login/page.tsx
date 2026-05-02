@@ -26,7 +26,15 @@ export default function LoginPage() {
         setCarregando(false)
         return
       }
-      router.push('/')
+      const res = await fetch('/api/me')
+      const { papel } = await res.json()
+      const rotas: Record<string, string> = {
+        superadmin: '/superadmin/dashboard',
+        coordenador: '/coordenador/dashboard',
+        diretor: '/diretor/dashboard',
+        professor: '/professor/provas',
+      }
+      router.push(rotas[papel] ?? '/coordenador/dashboard')
     } else {
       const { error } = await supabase.auth.signInWithOtp({ email })
       if (error) {
