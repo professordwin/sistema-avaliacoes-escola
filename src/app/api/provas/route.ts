@@ -25,7 +25,7 @@ export async function POST(request: Request) {
     .from('usuarios').select('tenant_id').eq('id', user.id).single()
 
   const body = await request.json()
-  const { questao_ids, ...provaData } = body
+  const { questao_ids, gabarito, ...provaData } = body
 
   const { data: prova, error } = await supabase
     .from('provas')
@@ -39,6 +39,20 @@ export async function POST(request: Request) {
       prova_id: prova.id, questao_id: id, ordem: i + 1, peso: 1.0
     }))
     await supabase.from('prova_questoes').insert(relacoes)
+  }
+
+  // Salva gabarito se fornecido
+  if (gabarito && Object.keys(gabarito).length > 0) {
+    const gabaritoRows = Object.entries(gabarito)
+      .filter(([, alt]) => alt)
+      .map(([questao, alt]) => ({
+        prova_id: prova.id,
+        questao_numero: parseInt(questao),
+        alternativa_correta: alt as string,
+      }))
+    if (gabaritoRows.length > 0) {
+      await supabase.from('gabarito_prova').insert(gabaritoRows)
+    }
   }
 
   return NextResponse.json(prova, { status: 201 })

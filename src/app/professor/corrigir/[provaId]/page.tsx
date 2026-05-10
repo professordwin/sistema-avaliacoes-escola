@@ -13,50 +13,127 @@ interface DadosAluno {
 }
 
 export default function CorrigirOMRPage() {
-  const { provaId } = useParams()
-  const [etapa, setEtapa] = useState<'captura' | 'processando' | 'resultado'>('captura')
+  const params = useParams()
+
+  const provaId =
+    typeof params.provaId === 'string'
+      ? params.provaId
+      : Array.isArray(params.provaId)
+      ? params.provaId[0]
+      : ''
+
+  const [etapa, setEtapa] = useState<
+    'captura' | 'processando' | 'resultado'
+  >('captura')
+
   const [preview, setPreview] = useState<string | null>(null)
-  const [resultado, setResultado] = useState<ResultadoCorrecao | null>(null)
-  const [dadosAluno, setDadosAluno] = useState<DadosAluno | null>(null)
+
+  const [resultado, setResultado] =
+    useState<ResultadoCorrecao | null>(null)
+
+  const [dadosAluno, setDadosAluno] =
+    useState<DadosAluno | null>(null)
+
   const [erro, setErro] = useState<string | null>(null)
+
   const [progresso, setProgresso] = useState('')
-  const [qrDetectado, setQrDetectado] = useState(false)
+
+  const [qrDetectado, setQrDetectado] =
+    useState(false)
+
+  const [arquivoNome, setArquivoNome] =
+    useState('')
+
+  const [imagemProcessada, setImagemProcessada] =
+    useState(false)
+
   const fileRef = useRef<HTMLInputElement>(null)
 
-  const handleImagem = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (!file) return
-    const reader = new FileReader()
-    reader.onloadend = () => setPreview(reader.result as string)
-    reader.readAsDataURL(file)
-    setErro(null)
-  }, [])
+  const handleImagem = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0]
+
+      if (!file) return
+
+      // Validação tamanho
+      if (file.size > 10 * 1024 * 1024) {
+        setErro('A imagem deve ter no máximo 10MB.')
+        return
+      }
+
+      // Validação tipo
+      if (!file.type.startsWith('image/')) {
+        setErro('Selecione apenas imagens.')
+        return
+      }
+
+      setArquivoNome(file.name)
+      setErro(null)
+      setResultado(null)
+      setDadosAluno(null)
+      setQrDetectado(false)
+
+      const reader = new FileReader()
+
+      reader.onloadend = () => {
+        setPreview(reader.result as string)
+        setImagemProcessada(false)
+      }
+
+      reader.readAsDataURL(file)
+    },
+    []
+  )
 
   const processarImagem = async () => {
-    if (!preview) return
+    if (!preview || !provaId) {
+      setErro('Imagem ou prova inválida.')
+      return
+    }
+
     setEtapa('processando')
-    setProgresso('Carregando motor OCR...')
     setErro(null)
+    setProgresso('Inicializando OCR...')
 
     try {
       const Tesseract = await import('tesseract.js')
+
       setProgresso('Lendo folha de respostas...')
 
-      const { data } = await Tesseract.recognize(preview, 'por+eng', {
-        logger: (m: { status: string; progress: number }) => {
-          if (m.status === 'recognizing text') {
-            setProgresso(`Lendo... ${Math.round(m.progress * 100)}%`)
-          }
-        },
-      })
+      const { data } = await Tesseract.recognize(
+        preview,
+        'por+eng',
+        {
+          logger: (m: {
+            status: string
+            progress: number
+          }) => {
+            if (m.status === 'recognizing text') {
+              setProgresso(
+                `Lendo imagem... ${Math.round(
+                  m.progress * 100
+                )}%`
+              )
+            }
+          },
+        }
+      )
 
       const textoOCR = data.text
-      console.log('OCR:', textoOCR)
-      setProgresso('Identificando aluno e calculando nota...')
+
+      console.log('OCR EXTRAÍDO:', textoOCR)
+
+      setProgresso(
+        'Buscando gabarito e identificando aluno...'
+      )
 
       const res = await fetch('/api/corrigir-omr', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+        },
+
+        // ✅ AJUSTADO
         body: JSON.stringify({
           textoOCR,
           provaId,
@@ -66,123 +143,283 @@ export default function CorrigirOMRPage() {
         }),
       })
 
-      const data2 = await res.json()
+      const resposta = await res.json()
 
-      if (!res.ok || data2.erro) {
-        setErro(data2.erro ?? 'Erro ao processar')
-        setEtapa('captura')
-        return
+      console.log('RESULTADO API:', resposta)
+
+      if (!res.ok || resposta.erro) {
+        throw new Error(
+          resposta.erro ??
+            'Erro ao processar folha.'
+        )
       }
 
-      setQrDetectado(data2.qrDetectado)
-      setDadosAluno(data2.dadosAluno)
-      setResultado(data2.resultado)
-      setEtapa('resultado')
+      setQrDetectado(
+        Boolean(resposta.qrDetectado)
+      )
 
+      setDadosAluno(
+        resposta.dadosAluno ?? null
+      )
+
+      setResultado(
+        resposta.resultado ?? null
+      )
+
+      setImagemProcessada(true)
+
+      setEtapa('resultado')
     } catch (err) {
       console.error(err)
-      setErro('Falha no processamento. Tente novamente.')
+
+      setErro(
+        err instanceof Error
+          ? err.message
+          : 'Falha no processamento.'
+      )
+
       setEtapa('captura')
     }
   }
 
   const reiniciar = () => {
     setEtapa('captura')
+
     setPreview(null)
+
     setResultado(null)
+
     setDadosAluno(null)
+
     setErro(null)
+
     setProgresso('')
+
     setQrDetectado(false)
-    if (fileRef.current) fileRef.current.value = ''
+
+    setImagemProcessada(false)
+
+    setArquivoNome('')
+
+    if (fileRef.current) {
+      fileRef.current.value = ''
+    }
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-4 max-w-lg mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-800">📷 Correção por Câmera</h1>
-        <p className="text-gray-500 text-sm mt-1">Fotografe a folha de respostas — o aluno é identificado automaticamente pelo QR Code</p>
-      </div>
+    <div className="min-h-screen bg-gray-50">
+      {/* HEADER */}
+      <header className="bg-white border-b border-gray-200">
+        <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-800">
+              📷 Correção por Câmera
+            </h1>
 
-      {etapa === 'captura' && (
-        <div className="space-y-4">
-          {/* Dica QR */}
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 text-sm text-blue-700">
-            <p className="font-semibold mb-1">💡 Como funciona</p>
-            <p>Cada folha de resposta tem um QR Code exclusivo com o nome do aluno e a prova. Basta fotografar — o sistema identifica tudo automaticamente.</p>
+            <p className="text-sm text-gray-500 mt-1">
+              Fotografe a folha de respostas para
+              correção automática
+            </p>
           </div>
 
-          <div
-            onClick={() => fileRef.current?.click()}
-            className="border-2 border-dashed border-blue-300 rounded-2xl p-8 text-center cursor-pointer hover:bg-blue-50 transition"
+          <a
+            href="/professor/provas"
+            className="text-sm text-indigo-600 hover:underline"
           >
-            {preview ? (
-              <img src={preview} alt="Folha capturada" className="max-h-64 mx-auto rounded-xl object-contain" />
-            ) : (
-              <div>
-                <p className="text-4xl mb-3">📄</p>
-                <p className="font-semibold text-blue-600">Toque para fotografar ou selecionar</p>
-                <p className="text-xs text-gray-400 mt-1">JPG, PNG — máx. 10MB</p>
+            ← Voltar
+          </a>
+        </div>
+      </header>
+
+      <main className="max-w-2xl mx-auto p-4">
+        {/* CAPTURA */}
+        {etapa === 'captura' && (
+          <div className="space-y-5">
+            {/* CARD INFO */}
+            <div className="bg-blue-50 border border-blue-200 rounded-2xl p-4">
+              <p className="font-semibold text-blue-800 mb-2">
+                💡 Como funciona
+              </p>
+
+              <ul className="text-sm text-blue-700 space-y-1">
+                <li>
+                  • Fotografe a folha inteira
+                </li>
+
+                <li>
+                  • O QR Code identifica o aluno
+                  automaticamente
+                </li>
+
+                <li>
+                  • O sistema busca o gabarito da
+                  prova no Supabase
+                </li>
+
+                <li>
+                  • A nota é calculada
+                  automaticamente
+                </li>
+              </ul>
+            </div>
+
+            {/* AREA UPLOAD */}
+            <div
+              onClick={() =>
+                fileRef.current?.click()
+              }
+              className="border-2 border-dashed border-blue-300 rounded-3xl p-8 bg-white text-center cursor-pointer hover:bg-blue-50 transition"
+            >
+              {preview ? (
+                <div className="space-y-4">
+                  <img
+                    src={preview}
+                    alt="Prévia"
+                    className="max-h-96 mx-auto rounded-2xl object-contain shadow"
+                  />
+
+                  <div>
+                    <p className="font-medium text-gray-700">
+                      {arquivoNome}
+                    </p>
+
+                    <p className="text-xs text-gray-400 mt-1">
+                      Clique para trocar a imagem
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="py-10">
+                  <p className="text-5xl mb-4">
+                    📄
+                  </p>
+
+                  <p className="text-lg font-semibold text-blue-700">
+                    Clique para fotografar
+                  </p>
+
+                  <p className="text-sm text-gray-500 mt-2">
+                    JPG ou PNG • até 10MB
+                  </p>
+                </div>
+              )}
+            </div>
+
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              capture="environment"
+              onChange={handleImagem}
+              className="hidden"
+            />
+
+            {/* ERRO */}
+            {erro && (
+              <div className="bg-red-50 border border-red-200 rounded-2xl p-4 text-red-700 text-sm">
+                ⚠️ {erro}
+              </div>
+            )}
+
+            {/* BOTÕES */}
+            {preview && (
+              <div className="flex gap-3">
+                <button
+                  onClick={reiniciar}
+                  className="flex-1 py-3 rounded-2xl border border-gray-300 bg-white text-gray-700 font-medium hover:bg-gray-100 transition"
+                >
+                  Trocar imagem
+                </button>
+
+                <button
+                  onClick={processarImagem}
+                  className="flex-1 py-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-semibold transition"
+                >
+                  Corrigir agora →
+                </button>
               </div>
             )}
           </div>
+        )}
 
-          <input ref={fileRef} type="file" accept="image/*" capture="environment" onChange={handleImagem} className="hidden" />
+        {/* PROCESSANDO */}
+        {etapa === 'processando' && (
+          <div className="bg-white border rounded-3xl p-10 mt-8 text-center">
+            <div className="text-5xl animate-spin mb-5">
+              ⚙️
+            </div>
 
-          {erro && (
-            <div className="bg-red-50 border border-red-200 rounded-xl p-3 text-red-700 text-sm">⚠️ {erro}</div>
-          )}
+            <h2 className="font-bold text-gray-800 text-lg">
+              Processando folha
+            </h2>
 
-          {preview && (
-            <div className="flex gap-3">
-              <button onClick={reiniciar} className="flex-1 py-3 rounded-xl border border-gray-300 text-gray-600 font-medium hover:bg-gray-100 transition">
-                Trocar foto
-              </button>
-              <button onClick={processarImagem} className="flex-1 py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition">
-                Corrigir agora →
-              </button>
+            <p className="text-sm text-gray-500 mt-2">
+              {progresso}
+            </p>
+
+            <div className="mt-6 w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+              <div className="bg-blue-600 h-3 w-3/4 animate-pulse" />
+            </div>
+          </div>
+        )}
+
+        {/* RESULTADO */}
+        {etapa === 'resultado' &&
+          resultado && (
+            <div className="space-y-4">
+              {/* STATUS QR */}
+              {qrDetectado ? (
+                <div className="bg-green-50 border border-green-200 rounded-2xl p-4 text-green-700 text-sm font-medium">
+                  ✅ QR Code identificado
+                  automaticamente
+                </div>
+              ) : (
+                <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 text-yellow-700 text-sm">
+                  ⚠️ QR Code não detectado
+                </div>
+              )}
+
+              {/* ALUNO */}
+              {dadosAluno && (
+                <div className="bg-white border rounded-2xl p-5">
+                  <p className="text-xs text-gray-400 mb-1">
+                    Aluno identificado
+                  </p>
+
+                  <h2 className="text-xl font-bold text-gray-800">
+                    {dadosAluno.nome}
+                  </h2>
+
+                  <p className="text-sm text-gray-500 mt-1">
+                    Turma {dadosAluno.turma} •{' '}
+                    {dadosAluno.serie}
+                  </p>
+                </div>
+              )}
+
+              {/* RESULTADO */}
+              <ResultadoOMR
+                resultado={resultado}
+                nomeAluno={
+                  dadosAluno?.nome
+                }
+                onNovo={reiniciar}
+              />
+
+              {/* RODAPÉ */}
+              {imagemProcessada && (
+                <div className="text-center">
+                  <button
+                    onClick={reiniciar}
+                    className="px-6 py-3 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-semibold transition"
+                  >
+                    Corrigir nova folha
+                  </button>
+                </div>
+              )}
             </div>
           )}
-        </div>
-      )}
-
-      {etapa === 'processando' && (
-        <div className="text-center py-20">
-          <div className="inline-block animate-spin text-4xl mb-4">⚙️</div>
-          <p className="font-semibold text-gray-700">{progresso || 'Processando...'}</p>
-          <p className="text-sm text-gray-400 mt-1">Aguarde alguns segundos</p>
-        </div>
-      )}
-
-      {etapa === 'resultado' && resultado && (
-        <div className="space-y-4">
-          {/* Badge QR */}
-          {qrDetectado ? (
-            <div className="bg-green-50 border border-green-200 rounded-xl p-3 text-sm text-green-700 font-medium">
-              ✅ QR Code identificado automaticamente
-            </div>
-          ) : (
-            <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-3 text-sm text-yellow-700">
-              ⚠️ QR Code não detectado — identificação manual necessária
-            </div>
-          )}
-
-          {/* Dados do aluno */}
-          {dadosAluno && (
-            <div className="bg-white border rounded-xl p-4">
-              <p className="text-xs text-gray-400 mb-1">Aluno identificado</p>
-              <p className="font-bold text-gray-800 text-lg">{dadosAluno.nome}</p>
-              <p className="text-gray-500 text-sm">Turma {dadosAluno.turma} · {dadosAluno.serie}</p>
-            </div>
-          )}
-
-          <ResultadoOMR
-            resultado={resultado}
-            nomeAluno={dadosAluno?.nome}
-            onNovo={reiniciar}
-          />
-        </div>
-      )}
+      </main>
     </div>
   )
 }
