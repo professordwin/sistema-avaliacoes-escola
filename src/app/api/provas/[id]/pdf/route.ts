@@ -33,10 +33,9 @@ export async function GET(
 
   if (!prova) return NextResponse.json({ error: 'Prova não encontrada' }, { status: 404 })
 
-  // Ordenar questões
   const questoes = (prova.prova_questoes ?? [])
     .sort((a: { ordem: number }, b: { ordem: number }) => a.ordem - b.ordem)
-    .map((pq: { ordem: number; questoes: { enunciado: string; alternativas: { letra: string; texto: string; correta: boolean }[] } }) => pq.questoes)
+    .map((pq: { questoes: { enunciado: string; alternativas: { letra: string; texto: string; correta: boolean }[] } }) => pq.questoes)
 
   return NextResponse.json({
     prova: {
