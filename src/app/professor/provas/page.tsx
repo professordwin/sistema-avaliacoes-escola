@@ -24,10 +24,12 @@ interface Prova {
   status: string
   instrucoes?: string
   tempo_minutos?: number
+
   disciplinas?: {
     nome: string
     cor_hex: string
   }
+
   prova_questoes?: {
     questoes: {
       enunciado: string
@@ -72,13 +74,9 @@ const STATUS_LABEL: Record<
 export default function MinhasProvas() {
   const router = useRouter()
 
-  const [provas, setProvas] = useState<
-    Prova[]
-  >([])
+  const [provas, setProvas] = useState<Prova[]>([])
 
-  const [questoes, setQuestoes] = useState<
-    Questao[]
-  >([])
+  const [questoes, setQuestoes] = useState<Questao[]>([])
 
   const [disciplinas, setDisciplinas] =
     useState<Disciplina[]>([])
@@ -114,6 +112,8 @@ export default function MinhasProvas() {
 
   const carregar = useCallback(async () => {
     try {
+      setCarregando(true)
+
       const [pRes, qRes, dRes] =
         await Promise.all([
           fetch('/api/provas'),
@@ -131,14 +131,25 @@ export default function MinhasProvas() {
         )
       }
 
-      setProvas(await pRes.json())
-      setQuestoes(await qRes.json())
-      setDisciplinas(await dRes.json())
+      const provasData = await pRes.json()
+      const questoesData =
+        await qRes.json()
+      const disciplinasData =
+        await dRes.json()
+
+      setProvas(provasData ?? [])
+      setQuestoes(questoesData ?? [])
+      setDisciplinas(
+        disciplinasData ?? []
+      )
     } catch (error) {
       console.error(error)
+
       setErro(
         'Erro ao carregar informações.'
       )
+    } finally {
+      setCarregando(false)
     }
   }, [])
 
@@ -156,18 +167,20 @@ export default function MinhasProvas() {
 
   async function criarProva() {
     if (
-      !form.titulo ||
+      !form.titulo.trim() ||
       !form.disciplina_id ||
       questoesSelecionadas.length === 0
     ) {
       setErro(
         'Preencha título, disciplina e selecione ao menos uma questão.'
       )
+
       return
     }
 
     try {
       setCarregando(true)
+
       setErro('')
 
       const res = await fetch(
@@ -178,8 +191,11 @@ export default function MinhasProvas() {
             'Content-Type':
               'application/json'
           },
+
           body: JSON.stringify({
             ...form,
+            titulo:
+              form.titulo.trim(),
             questao_ids:
               questoesSelecionadas
           })
@@ -193,7 +209,7 @@ export default function MinhasProvas() {
       }
 
       setSucesso(
-        'Prova criada com sucesso!'
+        '✅ Prova criada com sucesso!'
       )
 
       setForm({
@@ -227,21 +243,36 @@ export default function MinhasProvas() {
     id: string
   ) {
     try {
-      await fetch(`/api/provas/${id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type':
-            'application/json'
-        },
-        body: JSON.stringify({
-          status:
-            'aguardando_aprovacao'
-        })
-      })
+      const res = await fetch(
+        `/api/provas/${id}`,
+        {
+          method: 'PATCH',
 
-      carregar()
+          headers: {
+            'Content-Type':
+              'application/json'
+          },
+
+          body: JSON.stringify({
+            status:
+              'aguardando_aprovacao'
+          })
+        }
+      )
+
+      if (!res.ok) {
+        throw new Error(
+          'Erro ao enviar prova'
+        )
+      }
+
+      await carregar()
     } catch (error) {
       console.error(error)
+
+      setErro(
+        'Erro ao enviar prova para aprovação.'
+      )
     }
   }
 
@@ -260,36 +291,40 @@ export default function MinhasProvas() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
-            <span className="text-white text-sm font-bold">
-              A
+      {/* HEADER */}
+      <header className="bg-white border-b border-gray-200 px-6 py-4">
+        <div className="max-w-6xl mx-auto flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center">
+              <span className="text-white text-sm font-bold">
+                A
+              </span>
+            </div>
+
+            <span className="font-semibold text-gray-900">
+              AvaliaEscola
+            </span>
+
+            <span className="text-gray-400">
+              ›
+            </span>
+
+            <span className="text-gray-600 text-sm">
+              Minhas Provas
             </span>
           </div>
 
-          <span className="font-semibold text-gray-900">
-            AvaliaEscola
-          </span>
-
-          <span className="text-gray-400">
-            ›
-          </span>
-
-          <span className="text-gray-600 text-sm">
-            Minhas Provas
-          </span>
+          <a
+            href="/professor/dashboard"
+            className="text-sm text-indigo-600 hover:underline"
+          >
+            ← Painel
+          </a>
         </div>
-
-        <a
-          href="/professor/dashboard"
-          className="text-sm text-indigo-600 hover:underline"
-        >
-          ← Painel
-        </a>
       </header>
 
-      <main className="max-w-5xl mx-auto px-6 py-8">
+      <main className="max-w-6xl mx-auto px-6 py-8">
+        {/* ABAS */}
         <div className="flex gap-2 mb-6">
           {[
             {
@@ -324,39 +359,51 @@ export default function MinhasProvas() {
           ))}
         </div>
 
+        {/* ALERTAS */}
         {sucesso && (
-          <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">
+          <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-xl text-sm">
             {sucesso}
           </div>
         )}
 
         {erro && (
-          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">
+          <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-xl text-sm">
             {erro}
           </div>
         )}
 
+        {/* LISTAGEM */}
         {aba === 'listar' && (
           <div className="space-y-4">
-            {provas.length === 0 && (
+            {carregando && (
               <div className="bg-white border rounded-2xl p-10 text-center">
-                <p className="text-gray-500 font-medium">
-                  Nenhuma prova criada
-                </p>
-
-                <p className="text-gray-400 text-sm mt-1">
-                  Clique em "Nova
-                  Prova" para começar
+                <p className="text-gray-500">
+                  Carregando provas...
                 </p>
               </div>
             )}
 
+            {!carregando &&
+              provas.length === 0 && (
+                <div className="bg-white border rounded-2xl p-10 text-center">
+                  <p className="text-gray-500 font-medium">
+                    Nenhuma prova criada
+                  </p>
+
+                  <p className="text-gray-400 text-sm mt-1">
+                    Clique em "Nova
+                    Prova" para começar
+                  </p>
+                </div>
+              )}
+
             {provas.map((p) => (
               <div
                 key={p.id}
-                className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm"
+                className="bg-white rounded-2xl border border-gray-200 p-5 shadow-sm hover:shadow-md transition"
               >
                 <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                  {/* INFO */}
                   <div className="flex-1">
                     <h3 className="font-semibold text-lg text-gray-900">
                       {p.titulo}
@@ -416,7 +463,9 @@ export default function MinhasProvas() {
                     )}
                   </div>
 
+                  {/* AÇÕES */}
                   <div className="flex flex-wrap gap-2">
+                    {/* RASCUNHO */}
                     {p.status ===
                       'rascunho' && (
                       <button
@@ -431,6 +480,7 @@ export default function MinhasProvas() {
                       </button>
                     )}
 
+                    {/* APROVADA */}
                     {p.status ===
                       'aprovada' && (
                       <div className="flex gap-2 flex-wrap">
@@ -448,6 +498,28 @@ export default function MinhasProvas() {
                         <button
                           onClick={() =>
                             router.push(
+                              `/professor/corrigir/${p.id}`
+                            )
+                          }
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm rounded-lg font-medium transition"
+                        >
+                          📷 Corrigir
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            router.push(
+                              `/professor/resultados`
+                            )
+                          }
+                          className="px-4 py-2 bg-purple-100 hover:bg-purple-200 text-purple-700 text-sm rounded-lg font-medium transition"
+                        >
+                          📊 Resultados
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            router.push(
                               `/professor/provas/${p.id}/imprimir`
                             )
                           }
@@ -458,6 +530,7 @@ export default function MinhasProvas() {
                       </div>
                     )}
 
+                    {/* APLICADA */}
                     {p.status ===
                       'aplicada' && (
                       <button
@@ -478,13 +551,15 @@ export default function MinhasProvas() {
           </div>
         )}
 
+        {/* CRIAR */}
         {aba === 'criar' && (
-          <div className="bg-white rounded-2xl border border-gray-200 p-6">
+          <div className="bg-white rounded-2xl border border-gray-200 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900 mb-6">
               Nova Prova
             </h2>
 
             <div className="space-y-5">
+              {/* TITULO */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Título da prova
@@ -505,6 +580,7 @@ export default function MinhasProvas() {
                 />
               </div>
 
+              {/* DISCIPLINA / TEMPO */}
               <div className="grid md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -567,6 +643,7 @@ export default function MinhasProvas() {
                 </div>
               </div>
 
+              {/* INSTRUÇÕES */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
                   Instruções
@@ -589,10 +666,14 @@ export default function MinhasProvas() {
                 />
               </div>
 
+              {/* QUESTÕES */}
               <div className="border-t pt-5">
-                <div className="flex items-center justify-between mb-4">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
                   <h3 className="font-semibold text-gray-800">
-                    Questões
+                    Questões selecionadas:{' '}
+                    {
+                      questoesSelecionadas.length
+                    }
                   </h3>
 
                   <select
@@ -623,7 +704,7 @@ export default function MinhasProvas() {
                   </select>
                 </div>
 
-                <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                <div className="space-y-3 max-h-[450px] overflow-y-auto pr-1">
                   {questoesFiltradas.map(
                     (q) => (
                       <button
@@ -669,7 +750,7 @@ export default function MinhasProvas() {
                             </div>
                           </div>
 
-                          <div className="text-indigo-600 font-bold">
+                          <div className="text-indigo-600 font-bold text-lg">
                             {questoesSelecionadas.includes(
                               q.id
                             )
@@ -680,9 +761,17 @@ export default function MinhasProvas() {
                       </button>
                     )
                   )}
+
+                  {questoesFiltradas.length ===
+                    0 && (
+                    <div className="text-center py-10 text-gray-400 text-sm">
+                      Nenhuma questão encontrada
+                    </div>
+                  )}
                 </div>
               </div>
 
+              {/* BOTÃO */}
               <div className="pt-4 flex justify-end">
                 <button
                   onClick={criarProva}
