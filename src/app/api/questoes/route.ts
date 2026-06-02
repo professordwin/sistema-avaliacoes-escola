@@ -5,6 +5,7 @@ export async function GET(request: Request) {
   const supabase = await createServerSupabaseClient()
   const { searchParams } = new URL(request.url)
   const disciplina_id = searchParams.get('disciplina_id')
+  const ano_escolar = searchParams.get('ano_escolar')
 
   let query = supabase
     .from('questoes')
@@ -17,6 +18,10 @@ export async function GET(request: Request) {
 
   if (disciplina_id) {
     query = query.eq('disciplina_id', disciplina_id)
+  }
+
+  if (ano_escolar) {
+    query = query.eq('ano_escolar', Number(ano_escolar))
   }
 
   const { data, error } = await query
