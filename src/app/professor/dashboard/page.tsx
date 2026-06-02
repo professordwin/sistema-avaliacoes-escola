@@ -133,13 +133,31 @@ export default async function ProfessorDashboard() {
             </div>
           </div>
 
-          {/* Usuário */}
-          <div className="text-right">
-            <p className="text-sm text-gray-500">Bem-vindo</p>
+          {/* Usuário + Sair */}
+          <div className="flex items-center gap-4">
+            <div className="text-right">
+              <p className="text-sm text-gray-500">Bem-vindo</p>
 
-            <p className="font-semibold text-gray-900">
-              {usuario.nome ?? 'Professor'}
-            </p>
+              <p className="font-semibold text-gray-900">
+                {usuario.nome ?? 'Professor'}
+              </p>
+            </div>
+
+            <form action="/api/auth/signout" method="post">
+              <button
+                type="submit"
+                className="
+                  text-sm text-gray-500
+                  hover:text-gray-700
+                  transition
+                  px-3 py-2
+                  rounded-lg
+                  hover:bg-gray-100
+                "
+              >
+                Sair
+              </button>
+            </form>
           </div>
         </div>
       </header>
