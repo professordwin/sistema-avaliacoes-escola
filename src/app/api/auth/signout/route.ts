@@ -1,8 +1,10 @@
 import { createServerSupabaseClient } from '@/lib/supabase-server'
 import { NextResponse } from 'next/server'
 
-export async function POST() {
+export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient()
   await supabase.auth.signOut()
-  return NextResponse.redirect(new URL('/login', process.env.NEXT_PUBLIC_SUPABASE_URL!.replace('.supabase.co', '') + '.vercel.app'))
+  
+  const origin = new URL(request.url).origin
+  return NextResponse.redirect(`${origin}/login`)
 }
