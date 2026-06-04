@@ -25,36 +25,21 @@ export default function AlunosPage() {
   const [alunos, setAlunos] = useState<Aluno[]>([])
   const [carregando, setCarregando] = useState(true)
   const [importando, setImportando] = useState(false)
-
-  const [mensagem, setMensagem] =
-    useState<Mensagem | null>(null)
-
-  const [filtroTurma, setFiltroTurma] =
-    useState('')
+  const [mensagem, setMensagem] = useState<Mensagem | null>(null)
+  const [filtroTurma, setFiltroTurma] = useState('')
 
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // Trecho ajustado para carregar os alunos através da API interna
   const carregarAlunos = async () => {
     try {
       setCarregando(true)
-
-      const { data, error } = await supabase
-        .from('alunos')
-        .select('*')
-        .order('nome')
-
-      if (error) {
-        throw error
-      }
-
-      setAlunos((data ?? []) as Aluno[])
+      const res = await fetch('/api/alunos')
+      const data = await res.json()
+      setAlunos(Array.isArray(data) ? data : [])
     } catch (error) {
       console.error(error)
-
-      setMensagem({
-        tipo: 'erro',
-        texto: 'Erro ao carregar alunos'
-      })
+      setMensagem({ tipo: 'erro', texto: 'Erro ao carregar alunos' })
     } finally {
       setCarregando(false)
     }
@@ -64,11 +49,8 @@ export default function AlunosPage() {
     carregarAlunos()
   }, [])
 
-  const handleImportar = async (
-    e: React.ChangeEvent<HTMLInputElement>
-  ) => {
+  const handleImportar = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
-
     if (!file) return
 
     setImportando(true)
@@ -80,52 +62,39 @@ export default function AlunosPage() {
       } = await supabase.auth.getUser()
 
       // Converte arquivo para base64
-      const base64 = await new Promise<string>(
-        (resolve, reject) => {
-          const reader = new FileReader()
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader()
 
-          reader.onload = () => {
-            try {
-              const resultado = reader.result as string
-
-              const base64String =
-                resultado.split(',')[1]
-
-              resolve(base64String)
-            } catch (error) {
-              reject(error)
-            }
+        reader.onload = () => {
+          try {
+            const resultado = reader.result as string
+            const base64String = resultado.split(',')[1]
+            resolve(base64String)
+          } catch (error) {
+            reject(error)
           }
-
-          reader.onerror = reject
-
-          reader.readAsDataURL(file)
         }
-      )
 
-      const response = await fetch(
-        '/api/alunos/importar',
-        {
-          method: 'POST',
+        reader.onerror = reject
+        reader.readAsDataURL(file)
+      })
 
-          headers: {
-            'Content-Type': 'application/json'
-          },
-
-          body: JSON.stringify({
-            arquivoBase64: base64,
-            nomeArquivo: file.name,
-            professorId: user?.id ?? ''
-          })
-        }
-      )
+      const response = await fetch('/api/alunos/importar', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          arquivoBase64: base64,
+          nomeArquivo: file.name,
+          professorId: user?.id ?? ''
+        })
+      })
 
       const resultado = await response.json()
 
       if (!response.ok) {
-        throw new Error(
-          resultado.erro ?? 'Erro ao importar'
-        )
+        throw new Error(resultado.erro ?? 'Erro ao importar')
       }
 
       setMensagem({
@@ -139,10 +108,7 @@ export default function AlunosPage() {
 
       setMensagem({
         tipo: 'erro',
-        texto:
-          err instanceof Error
-            ? err.message
-            : 'Erro ao importar planilha'
+        texto: err instanceof Error ? err.message : 'Erro ao importar planilha'
       })
     } finally {
       setImportando(false)
@@ -153,24 +119,17 @@ export default function AlunosPage() {
     }
   }
 
-  const turmas = [
-    ...new Set(alunos.map((a) => a.turma))
-  ].sort()
+  const turmas = [...new Set(alunos.map((a) => a.turma))].sort()
 
   const alunosFiltrados = filtroTurma
-    ? alunos.filter(
-        (a) => a.turma === filtroTurma
-      )
+    ? alunos.filter((a) => a.turma === filtroTurma)
     : alunos
 
   return (
     <div className="max-w-5xl mx-auto p-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-gray-800">
-            Gerenciar Alunos
-          </h1>
-
+          <h1 className="text-2xl font-bold text-gray-800">Gerenciar Alunos</h1>
           <p className="text-gray-500 text-sm mt-1">
             {alunos.length} alunos cadastrados
           </p>
@@ -178,26 +137,18 @@ export default function AlunosPage() {
 
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() =>
-              window.open(
-                '/planilha_modelo_alunos.xlsx'
-              )
-            }
+            onClick={() => window.open('/planilha_modelo_alunos.xlsx')}
             className="px-4 py-2 rounded-xl border border-blue-300 text-blue-600 text-sm font-medium hover:bg-blue-50 transition"
           >
             Baixar Modelo Excel
           </button>
 
           <button
-            onClick={() =>
-              fileRef.current?.click()
-            }
+            onClick={() => fileRef.current?.click()}
             disabled={importando}
             className="px-4 py-2 rounded-xl bg-blue-600 text-white text-sm font-semibold hover:bg-blue-700 transition disabled:opacity-50"
           >
-            {importando
-              ? 'Importando...'
-              : 'Importar Planilha'}
+            {importando ? 'Importando...' : 'Importar Planilha'}
           </button>
 
           <input
@@ -223,31 +174,20 @@ export default function AlunosPage() {
       )}
 
       <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800">
-        <p className="font-semibold mb-1">
-          Formato da planilha
-        </p>
-
-        <p>
-          Colunas obrigatórias:
-        </p>
-
+        <p className="font-semibold mb-1">Formato da planilha</p>
+        <p>Colunas obrigatórias:</p>
         <div className="mt-2 font-mono text-xs bg-white border border-amber-200 rounded p-2">
-          nome_aluno | turma | serie |
-          observacoes
+          nome_aluno | turma | serie | observacoes
         </div>
-
         <p className="mt-3">
-          Baixe o modelo acima para garantir o
-          formato correto.
+          Baixe o modelo acima para garantir o formato correto.
         </p>
       </div>
 
       {turmas.length > 0 && (
         <div className="mb-6 flex gap-2 flex-wrap">
           <button
-            onClick={() =>
-              setFiltroTurma('')
-            }
+            onClick={() => setFiltroTurma('')}
             className={`px-3 py-1 rounded-full text-sm font-medium transition ${
               !filtroTurma
                 ? 'bg-blue-600 text-white'
@@ -260,9 +200,7 @@ export default function AlunosPage() {
           {turmas.map((t) => (
             <button
               key={t}
-              onClick={() =>
-                setFiltroTurma(t)
-              }
+              onClick={() => setFiltroTurma(t)}
               className={`px-3 py-1 rounded-full text-sm font-medium transition ${
                 filtroTurma === t
                   ? 'bg-blue-600 text-white'
@@ -284,7 +222,6 @@ export default function AlunosPage() {
           <p className="text-gray-500 font-medium">
             Nenhum aluno cadastrado ainda
           </p>
-
           <p className="text-gray-400 text-sm mt-1">
             Importe uma planilha para começar
           </p>
@@ -298,53 +235,37 @@ export default function AlunosPage() {
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">
                     Nome
                   </th>
-
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">
                     Turma
                   </th>
-
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">
                     Série
                   </th>
-
                   <th className="text-left px-4 py-3 font-semibold text-gray-600">
                     Observações
                   </th>
                 </tr>
               </thead>
-
               <tbody>
-                {alunosFiltrados.map(
-                  (aluno, i) => (
-                    <tr
-                      key={aluno.id}
-                      className={
-                        i % 2 === 0
-                          ? 'bg-white'
-                          : 'bg-gray-50'
-                      }
-                    >
-                      <td className="px-4 py-3 font-medium text-gray-800">
-                        {aluno.nome}
-                      </td>
-
-                      <td className="px-4 py-3">
-                        <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
-                          {aluno.turma}
-                        </span>
-                      </td>
-
-                      <td className="px-4 py-3 text-gray-600">
-                        {aluno.serie}
-                      </td>
-
-                      <td className="px-4 py-3 text-gray-400 text-xs">
-                        {aluno.observacoes ??
-                          '-'}
-                      </td>
-                    </tr>
-                  )
-                )}
+                {alunosFiltrados.map((aluno, i) => (
+                  <tr
+                    key={aluno.id}
+                    className={i % 2 === 0 ? 'bg-white' : 'bg-gray-50'}
+                  >
+                    <td className="px-4 py-3 font-medium text-gray-800">
+                      {aluno.nome}
+                    </td>
+                    <td className="px-4 py-3">
+                      <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-medium">
+                        {aluno.turma}
+                      </span>
+                    </td>
+                    <td className="px-4 py-3 text-gray-600">{aluno.serie}</td>
+                    <td className="px-4 py-3 text-gray-400 text-xs">
+                      {aluno.observacoes ?? '-'}
+                    </td>
+                  </tr>
+                ))}
               </tbody>
             </table>
           </div>
