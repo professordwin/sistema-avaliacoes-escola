@@ -8,7 +8,6 @@ interface ProvaData {
   prova: {
     id: string
     titulo: string
-    instrucoes?: string
     disciplina?: string
     professor?: string
   }
@@ -23,9 +22,9 @@ interface Aluno {
 }
 
 const LETRAS = ['A', 'B', 'C', 'D', 'E']
-const QUESTOES_POR_LINHA = 3
+const ESCOLA = 'CED 06 DO GAMA'
 
-export default function ImprimirFolhaRespostas() {
+export default function ImprimirCartaoRespostas() {
   const params = useParams<{ id: string }>()
 
   const [data, setData] = useState<ProvaData | null>(null)
@@ -72,7 +71,7 @@ export default function ImprimirFolhaRespostas() {
         try {
           qrs[aluno.id] = await QRCode.toDataURL(
             `PROVA:${data.prova.id}|ALUNO:${aluno.id}`,
-            { width: 200, margin: 1, errorCorrectionLevel: 'H' }
+            { width: 160, margin: 1, errorCorrectionLevel: 'H' }
           )
         } catch (err) {
           console.error(err)
@@ -90,7 +89,7 @@ export default function ImprimirFolhaRespostas() {
   if (carregando) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <p className="text-gray-500">Preparando folhas...</p>
+        <p className="text-gray-500">Preparando cartões...</p>
       </div>
     )
   }
@@ -101,161 +100,172 @@ export default function ImprimirFolhaRespostas() {
 
   const prova = data.prova
 
-  // Agrupa questões em linhas de 3
-  const linhas: number[][] = []
-  for (let i = 0; i < totalQuestoes; i += QUESTOES_POR_LINHA) {
-    linhas.push(
-      Array.from(
-        { length: Math.min(QUESTOES_POR_LINHA, totalQuestoes - i) },
-        (_, j) => i + j + 1
-      )
-    )
-  }
+  // Divide questões em duas colunas de até 25
+  const col1 = Array.from({ length: Math.min(25, totalQuestoes) }, (_, i) => i + 1)
+  const col2 = Array.from({ length: Math.max(0, totalQuestoes - 25) }, (_, i) => i + 26)
 
-  const FolhaRespostas = ({ aluno, qr }: { aluno: Aluno; qr?: string }) => (
-    <div
-      style={{
-        width: '210mm',
-        minHeight: '297mm',
-        padding: '14mm',
-        margin: '0 auto',
-        background: 'white',
-        pageBreakAfter: 'always',
-        fontFamily: 'Arial, sans-serif',
-      }}
-    >
+  const CartaoAluno = ({ aluno, qr }: { aluno: Aluno; qr?: string }) => (
+    <div style={{
+      width: '210mm',
+      height: '297mm',
+      margin: '0 auto',
+      background: 'white',
+      pageBreakAfter: 'always',
+      fontFamily: 'Arial, sans-serif',
+      display: 'flex',
+      flexDirection: 'column',
+      padding: '10mm 12mm',
+      boxSizing: 'border-box',
+    }}>
+
       {/* CABEÇALHO */}
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '8mm', paddingBottom: '4mm', borderBottom: '2px solid black', marginBottom: '4mm' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: '4mm' }}>
         
-        {/* INFO */}
-        <div style={{ flex: 1 }}>
-          <div style={{ fontSize: '9px', color: '#888', textTransform: 'uppercase', letterSpacing: '1px', marginBottom: '2mm' }}>
-            Folha de Respostas
+        {/* QR CODE TOPO ESQUERDO */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+          {qr ? (
+            <img src={qr} alt="QR" style={{ width: '28mm', height: '28mm' }} />
+          ) : (
+            <div style={{ width: '28mm', height: '28mm', border: '2px dashed #ccc' }} />
+          )}
+          <span style={{ fontSize: '7px', color: '#999', marginTop: '1mm' }}>NÃO RASURE</span>
+        </div>
+
+        {/* INFO CENTRAL */}
+        <div style={{ flex: 1, textAlign: 'center', padding: '0 4mm' }}>
+          <div style={{ fontSize: '11px', fontWeight: 'bold', color: '#333', textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            {ESCOLA}
           </div>
-          <div style={{ fontSize: '16px', fontWeight: 'bold', color: 'black', marginBottom: '1mm' }}>
+          <div style={{ fontSize: '15px', fontWeight: 'bold', color: 'black', marginTop: '1.5mm', marginBottom: '1.5mm' }}>
             {prova.titulo}
           </div>
-          <div style={{ fontSize: '11px', color: '#555', marginBottom: '4mm' }}>
-            {prova.disciplina} — Prof. {prova.professor}
+          <div style={{ fontSize: '10px', color: '#555' }}>
+            Cartão de Respostas
           </div>
 
-          {/* DADOS DO ALUNO */}
-          <div style={{ display: 'flex', gap: '6mm', alignItems: 'flex-end' }}>
-            <div style={{ flex: 1, borderBottom: '2px solid black', paddingBottom: '1mm' }}>
-              <div style={{ fontSize: '8px', color: '#999', marginBottom: '1mm' }}>Nome do aluno</div>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'black' }}>{aluno.nome}</div>
-            </div>
-            <div style={{ width: '18mm', borderBottom: '2px solid black', paddingBottom: '1mm' }}>
-              <div style={{ fontSize: '8px', color: '#999', marginBottom: '1mm' }}>Turma</div>
-              <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'black' }}>{aluno.turma}</div>
-            </div>
-            <div style={{ width: '28mm', borderBottom: '2px solid black', paddingBottom: '1mm' }}>
-              <div style={{ fontSize: '8px', color: '#999', marginBottom: '1mm' }}>Data</div>
-              <div style={{ fontSize: '12px', color: 'black' }}>____/____/______</div>
-            </div>
+          {/* ATENÇÃO */}
+          <div style={{
+            marginTop: '2mm',
+            border: '1.5px solid black',
+            borderRadius: '3px',
+            padding: '1.5mm 3mm',
+            display: 'inline-block',
+            fontSize: '9px',
+            color: '#333',
+          }}>
+            <strong>ATENÇÃO:</strong> Preencha completamente a bolha com caneta azul ou preta. Não rasure.
           </div>
         </div>
 
-        {/* QR CODE */}
-        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', flexShrink: 0 }}>
+        {/* QR CODE TOPO DIREITO */}
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
           {qr ? (
-            <>
-              <img src={qr} alt="QR Code" style={{ width: '42mm', height: '42mm' }} />
-              <div style={{ fontSize: '8px', color: '#999', marginTop: '1mm', textAlign: 'center' }}>NÃO RASURE</div>
-            </>
+            <img src={qr} alt="QR" style={{ width: '28mm', height: '28mm' }} />
           ) : (
-            <div style={{ width: '42mm', height: '42mm', border: '2px dashed #ccc', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-              <span style={{ fontSize: '10px', color: '#999' }}>QR</span>
-            </div>
+            <div style={{ width: '28mm', height: '28mm', border: '2px dashed #ccc' }} />
           )}
+          <span style={{ fontSize: '7px', color: '#999', marginTop: '1mm' }}>NÃO RASURE</span>
         </div>
       </div>
 
-      {/* INSTRUÇÃO */}
-      <div style={{ fontSize: '10px', color: '#555', background: '#f9f9f9', border: '1px solid #ddd', borderRadius: '3px', padding: '2mm 3mm', marginBottom: '5mm' }}>
-        <strong>Instruções:</strong> Preencha completamente o círculo da alternativa escolhida com caneta azul ou preta. Não rasure e não use corretivo.
-      </div>
-
-      {/* GRADE DE BOLHAS */}
-      <div style={{ border: '2px solid black', borderRadius: '4px', overflow: 'hidden' }}>
-        
-        {/* HEADER DA GRADE */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', background: '#f0f0f0', borderBottom: '2px solid black' }}>
-          {[0, 1, 2].map(col => (
-            <div key={col} style={{
-              display: 'grid',
-              gridTemplateColumns: '22px repeat(5, 1fr)',
-              borderRight: col < 2 ? '2px solid black' : 'none',
-            }}>
-              <div style={{ fontSize: '9px', fontWeight: 'bold', textAlign: 'center', padding: '2mm 0', borderRight: '1px solid #ccc' }}>Nº</div>
-              {LETRAS.map(l => (
-                <div key={l} style={{ fontSize: '10px', fontWeight: 'bold', textAlign: 'center', padding: '2mm 0' }}>{l}</div>
-              ))}
-            </div>
-          ))}
-        </div>
-
-        {/* LINHAS */}
-        {linhas.map((linha, li) => (
-          <div
-            key={li}
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(3, 1fr)',
-              borderBottom: li < linhas.length - 1 ? '1px solid #ddd' : 'none',
-            }}
-          >
-            {Array.from({ length: 3 }).map((_, col) => {
-              const num = linha[col]
-              return (
-                <div
-                  key={col}
-                  style={{
-                    display: 'grid',
-                    gridTemplateColumns: '22px repeat(5, 1fr)',
-                    alignItems: 'center',
-                    minHeight: '12mm',
-                    borderRight: col < 2 ? '2px solid black' : 'none',
-                    background: num ? 'white' : '#fafafa',
-                  }}
-                >
-                  {num ? (
-                    <>
-                      <div style={{ fontSize: '10px', fontWeight: 'bold', textAlign: 'center', color: '#333', borderRight: '1px solid #ddd' }}>
-                        {num}
-                      </div>
-                      {LETRAS.map(l => (
-                        <div key={l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <div style={{
-                            width: '10mm',
-                            height: '10mm',
-                            borderRadius: '50%',
-                            border: '1.5px solid #333',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                          }}>
-                            <span style={{ fontSize: '8px', color: '#444', fontWeight: 'bold' }}>{l}</span>
-                          </div>
-                        </div>
-                      ))}
-                    </>
-                  ) : (
-                    <div style={{ gridColumn: '1 / -1', background: '#f5f5f5' }} />
-                  )}
-                </div>
-              )
-            })}
+      {/* DADOS DO ALUNO */}
+      <div style={{
+        border: '1.5px solid black',
+        borderRadius: '3px',
+        padding: '2.5mm 4mm',
+        marginBottom: '4mm',
+        display: 'flex',
+        gap: '4mm',
+        alignItems: 'flex-end',
+      }}>
+        <div style={{ flex: 1 }}>
+          <div style={{ fontSize: '8px', color: '#888', marginBottom: '1mm', textTransform: 'uppercase' }}>Estudante</div>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'black', borderBottom: '1px solid #333', paddingBottom: '0.5mm' }}>
+            {aluno.nome}
           </div>
+        </div>
+        <div style={{ width: '20mm' }}>
+          <div style={{ fontSize: '8px', color: '#888', marginBottom: '1mm', textTransform: 'uppercase' }}>Turma</div>
+          <div style={{ fontSize: '13px', fontWeight: 'bold', color: 'black', borderBottom: '1px solid #333', paddingBottom: '0.5mm', textAlign: 'center' }}>
+            {aluno.turma}
+          </div>
+        </div>
+        <div style={{ width: '45mm' }}>
+          <div style={{ fontSize: '8px', color: '#888', marginBottom: '1mm', textTransform: 'uppercase' }}>Série</div>
+          <div style={{ fontSize: '12px', color: 'black', borderBottom: '1px solid #333', paddingBottom: '0.5mm' }}>
+            {aluno.serie}
+          </div>
+        </div>
+        <div style={{ width: '35mm' }}>
+          <div style={{ fontSize: '8px', color: '#888', marginBottom: '1mm', textTransform: 'uppercase' }}>Assinatura</div>
+          <div style={{ borderBottom: '1px solid #333', height: '5mm' }} />
+        </div>
+      </div>
+
+      {/* GRID DE QUESTÕES — 2 colunas */}
+      <div style={{ flex: 1, display: 'flex', gap: '6mm' }}>
+        {[col1, col2].map((coluna, ci) => (
+          coluna.length > 0 && (
+            <div key={ci} style={{ flex: 1 }}>
+              {/* Cabeçalho coluna */}
+              <div style={{
+                display: 'grid',
+                gridTemplateColumns: '18px repeat(5, 1fr)',
+                background: '#222',
+                color: 'white',
+                borderRadius: '3px 3px 0 0',
+                marginBottom: '0',
+              }}>
+                <div style={{ fontSize: '8px', fontWeight: 'bold', textAlign: 'center', padding: '2mm 0' }}>Nº</div>
+                {LETRAS.map(l => (
+                  <div key={l} style={{ fontSize: '9px', fontWeight: 'bold', textAlign: 'center', padding: '2mm 0' }}>{l}</div>
+                ))}
+              </div>
+
+              {/* Questões */}
+              <div style={{ border: '1.5px solid #333', borderTop: 'none', borderRadius: '0 0 3px 3px', overflow: 'hidden' }}>
+                {coluna.map((num, idx) => (
+                  <div key={num} style={{
+                    display: 'grid',
+                    gridTemplateColumns: '18px repeat(5, 1fr)',
+                    alignItems: 'center',
+                    borderBottom: idx < coluna.length - 1 ? '1px solid #e0e0e0' : 'none',
+                    background: idx % 2 === 0 ? 'white' : '#fafafa',
+                    minHeight: '9.2mm',
+                  }}>
+                    <div style={{ fontSize: '9px', fontWeight: 'bold', textAlign: 'center', color: '#333', borderRight: '1px solid #ddd' }}>
+                      {num}
+                    </div>
+                    {LETRAS.map(l => (
+                      <div key={l} style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{
+                          width: '8.5mm',
+                          height: '8.5mm',
+                          borderRadius: '50%',
+                          border: '1.5px solid #444',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          background: 'white',
+                        }}>
+                          <span style={{ fontSize: '7.5px', color: '#555', fontWeight: 'bold' }}>{l}</span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )
         ))}
       </div>
 
       {/* RODAPÉ */}
-      <div style={{ marginTop: '3mm', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <div style={{ fontSize: '9px', color: '#aaa' }}>
+      <div style={{ marginTop: '2mm', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <div style={{ fontSize: '8px', color: '#aaa' }}>
           ID: {prova.id.slice(0, 8).toUpperCase()} | {aluno.id.slice(0, 6).toUpperCase()}
         </div>
-        <div style={{ fontSize: '9px', color: '#aaa' }}>
+        <div style={{ fontSize: '8px', color: '#aaa' }}>
           {totalQuestoes} questões
         </div>
       </div>
@@ -269,7 +279,7 @@ export default function ImprimirFolhaRespostas() {
         <div className="flex items-center gap-3">
           <a href="/professor/provas" className="text-gray-400 hover:text-white text-sm">← Voltar</a>
           <span className="text-gray-600">|</span>
-          <span className="font-medium text-sm">{prova.titulo} — Folha de Respostas</span>
+          <span className="font-medium text-sm">{prova.titulo} — Cartão de Respostas</span>
         </div>
 
         <div className="flex items-center gap-3">
@@ -295,7 +305,7 @@ export default function ImprimirFolhaRespostas() {
             disabled={alunosFiltrados.length === 0}
             className="px-5 py-1.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-600 rounded text-sm font-medium transition"
           >
-            🖨️ Imprimir ({alunosFiltrados.length} folhas)
+            🖨️ Imprimir ({alunosFiltrados.length} cartões)
           </button>
         </div>
       </div>
@@ -305,16 +315,15 @@ export default function ImprimirFolhaRespostas() {
         <div className="print:hidden max-w-lg mx-auto mt-12 p-6 bg-yellow-50 border border-yellow-200 rounded-2xl text-center">
           <p className="text-2xl mb-2">⚠️</p>
           <p className="font-semibold text-yellow-800">Nenhum aluno cadastrado</p>
-          <p className="text-yellow-600 text-sm mt-1">Importe a planilha de alunos antes de imprimir.</p>
           <a href="/professor/alunos" className="inline-block mt-3 px-4 py-2 bg-yellow-600 text-white rounded-xl text-sm font-medium">
             Ir para Alunos
           </a>
         </div>
       )}
 
-      {/* FOLHAS */}
+      {/* CARTÕES */}
       {alunosFiltrados.map(aluno => (
-        <FolhaRespostas
+        <CartaoAluno
           key={aluno.id}
           aluno={aluno}
           qr={qrCodes[aluno.id]}
